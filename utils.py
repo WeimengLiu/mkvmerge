@@ -1,6 +1,5 @@
 import os
 import platform
-import winreg
 import subprocess
 import logging
 import sys
@@ -37,7 +36,8 @@ def get_mkvmerge_path() -> str:
         
     Note:
         Windows: 从注册表和常见安装路径查找MKVToolNix
-        其他系统: 默认使用'mkvmerge'命令
+        macOS: 从常见安装路径查找
+        Linux: 使用系统包管理器安装的版本
     """
     global _mkvmerge_path_cache
     
@@ -46,55 +46,77 @@ def get_mkvmerge_path() -> str:
         
     logger.info("开始查找 mkvmerge 路径...")
     
-    if platform.system() == 'Windows':
+    system = platform.system()
+    
+    if system == 'Windows':
         try:
+            import winreg
             # 尝试从注册表获取MKVToolNix安装路径
-            with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, 
-                              r'SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\MKVToolNix',
-                              0, winreg.KEY_READ | winreg.KEY_WOW64_64KEY) as key:
-                install_path = winreg.QueryValueEx(key, 'InstallLocation')[0]
-                mkvmerge_path = os.path.join(install_path, 'mkvmerge.exe')
-                if os.path.exists(mkvmerge_path):
-                    logger.info(f"从64位注册表找到 mkvmerge: {mkvmerge_path}")
-                    _mkvmerge_path_cache = mkvmerge_path
-                    return mkvmerge_path
-                
-        except WindowsError:
-            logger.debug("64位注册表查找失败，尝试32位注册表")
             try:
-                # 尝试从32位注册表获取
                 with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, 
-                                  r'SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\MKVToolNix',
-                                  0, winreg.KEY_READ) as key:
+                                  r'SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\MKVToolNix',
+                                  0, winreg.KEY_READ | winreg.KEY_WOW64_64KEY) as key:
                     install_path = winreg.QueryValueEx(key, 'InstallLocation')[0]
                     mkvmerge_path = os.path.join(install_path, 'mkvmerge.exe')
                     if os.path.exists(mkvmerge_path):
-                        logger.info(f"从32位注册表找到 mkvmerge: {mkvmerge_path}")
+                        logger.info(f"从64位注册表找到 mkvmerge: {mkvmerge_path}")
                         _mkvmerge_path_cache = mkvmerge_path
                         return mkvmerge_path
-            except WindowsError:
-                logger.debug("注册表查找失败")
+            except Exception:
+                logger.debug("64位注册表查找失败，尝试32位注册表")
+                try:
+                    # 尝试从32位注册表获取
+                    with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, 
+                                      r'SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\MKVToolNix',
+                                      0, winreg.KEY_READ) as key:
+                        install_path = winreg.QueryValueEx(key, 'InstallLocation')[0]
+                        mkvmerge_path = os.path.join(install_path, 'mkvmerge.exe')
+                        if os.path.exists(mkvmerge_path):
+                            logger.info(f"从32位注册表找到 mkvmerge: {mkvmerge_path}")
+                            _mkvmerge_path_cache = mkvmerge_path
+                            return mkvmerge_path
+                except Exception:
+                    logger.debug("注册表查找失败")
             
-        # 如果注册表查找失败，尝试常见安装路径
+            # 如果注册表查找失败，尝试常见安装路径
+            common_paths = [
+                r'C:\Program Files\MKVToolNix',
+                r'C:\Program Files (x86)\MKVToolNix',
+                os.path.join(os.environ.get('LOCALAPPDATA', ''), 'Programs', 'MKVToolNix'),
+                os.path.join(os.environ.get('APPDATA', ''), 'MKVToolNix'),
+            ]
+            
+            logger.debug("检查常见安装路径...")
+            for path in common_paths:
+                mkvmerge_path = os.path.join(path, 'mkvmerge.exe')
+                if os.path.exists(mkvmerge_path):
+                    logger.info(f"在常见路径找到 mkvmerge: {mkvmerge_path}")
+                    _mkvmerge_path_cache = mkvmerge_path
+                    return mkvmerge_path
+                    
+        except ImportError:
+            logger.debug("winreg 模块不可用")
+    
+    elif system == 'Darwin':  # macOS
         common_paths = [
-            r'C:\Program Files\MKVToolNix',
-            r'C:\Program Files (x86)\MKVToolNix',
-            os.path.join(os.environ.get('LOCALAPPDATA', ''), 'Programs', 'MKVToolNix'),
-            os.path.join(os.environ.get('APPDATA', ''), 'MKVToolNix'),
+            '/Applications/MKVToolNix.app/Contents/MacOS',
+            '/usr/local/bin',
+            '/opt/homebrew/bin',  # Apple Silicon Homebrew
+            os.path.expanduser('~/Applications/MKVToolNix.app/Contents/MacOS'),
         ]
         
-        logger.debug("检查常见安装路径...")
+        logger.debug("检查 macOS 常见安装路径...")
         for path in common_paths:
-            mkvmerge_path = os.path.join(path, 'mkvmerge.exe')
+            mkvmerge_path = os.path.join(path, 'mkvmerge')
             if os.path.exists(mkvmerge_path):
-                logger.info(f"在常见路径找到 mkvmerge: {mkvmerge_path}")
+                logger.info(f"在 macOS 路径找到 mkvmerge: {mkvmerge_path}")
                 _mkvmerge_path_cache = mkvmerge_path
                 return mkvmerge_path
     
     # 在PATH中查找mkvmerge
     logger.debug("在系统PATH中查找mkvmerge...")
     try:
-        if platform.system() == 'Windows':
+        if system == 'Windows':
             result = subprocess.run(['where', 'mkvmerge'], capture_output=True, text=True)
         else:
             result = subprocess.run(['which', 'mkvmerge'], capture_output=True, text=True)

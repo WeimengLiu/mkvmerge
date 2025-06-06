@@ -9,7 +9,6 @@ import subprocess as sp
 import configparser
 import os
 import platform
-import winreg  # 用于Windows注册表操作
 from utils import get_mkvmerge_path
 import sys
 
