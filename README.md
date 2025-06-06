@@ -14,7 +14,7 @@
 ## 系统要求
 
 - Python 3.8 或更高版本
-- 操作系统：Windows/macOS/Linux
+- 操作系统：Windows
 
 ## 安装
 
