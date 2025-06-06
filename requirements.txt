@@ -1,0 +1,21 @@
+# GUI相关
+PyQt6
+
+# 日志和格式化相关
+rich
+coloredlogs
+
+# 字幕处理
+pysubs2
+
+# 字体处理
+fontTools
+
+# 打包工具
+pyinstaller
+
+# 系统相关
+pywin32; platform_system == "Windows" 
+
+# MKV处理
+pymkv
