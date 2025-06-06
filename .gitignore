@@ -23,6 +23,7 @@ wheels/
 # PyInstaller
 *.manifest
 *.spec
+!main.spec
 
 # 虚拟环境
 venv/
